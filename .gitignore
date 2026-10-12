@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Training outputs / adapters (belong in S3, not git)
+out/
+*.safetensors
+
+# Local env
+.env
