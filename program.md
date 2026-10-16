@@ -29,10 +29,11 @@ Swap in your own task before launching the loop.
 
 ## 3. WHAT YOU (the agent) MAY CHANGE
 
-- `data/<task>_train.jsonl` — generate the training examples for the task.
+- The **training set** at `autotune/data/eval.json` (chat-format JSON) — you MAY
+  edit, add, remove, or rewrite its examples to improve the task behaviour.
 - `data/<task>_dev.jsonl` — generate the eval prompts you iterate against
-  (DIFFERENT prompts from the train set, to measure generalization — never copy
-  train rows into dev).
+  (DIFFERENT prompts from the training set, to measure generalization — never
+  copy training rows into dev).
 - `train_lora.py` **flags only**: `--lora-rank` (≤ 32), `--lora-alpha`,
   `--lora-dropout`, `--epochs`, `--lr`, `--max-seq-len`.
 - The eval `--mode` and `--target` that best capture the task (see §6).
@@ -55,9 +56,8 @@ server while training, restart it to evaluate.
 # 1. free the GPU
 docker stop gemma-lora
 
-# 2. train with the current knobs
-cd training
-python train_lora.py --dataset data/<task>_train.jsonl --output-dir ./out/<task> --epochs <n>
+# 2. train with the current knobs (training code + data are local to this repo)
+python train_lora.py --dataset data/eval.json --output-dir ./out/<task> --epochs <n>
 
 # 3. serve + load the fresh adapter for eval
 docker start gemma-lora                     # wait until :8001/health reports vllm_ready:true

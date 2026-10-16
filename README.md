@@ -12,7 +12,10 @@ deterministic scorer, and iterates toward the objective — keeping the best ada
 | File | Purpose |
 |---|---|
 | [`program.md`](program.md) | The driver. A human fills in the **TASK**; the rest is the fixed contract the agent follows (what it may edit, how to run, the loop protocol). |
+| [`train_lora.py`](train_lora.py) | QLoRA fine-tuning script. Trains a LoRA adapter on `data/eval.json`; the agent tunes its flags. |
+| [`requirements-train.txt`](requirements-train.txt) | Training dependencies (torch, transformers, peft, trl, …) for a local venv. |
 | [`eval_adapter.py`](eval_adapter.py) | Deterministic eval harness. Queries a running vLLM server and prints a scalar `match_rate`. Modes: `exact`, `contains`, `regex`. |
+| [`data/eval.json`](data/eval.json) | The training set (chat-format). The agent may edit it to improve the task behaviour. |
 | [`data/eval_nono.jsonl`](data/eval_nono.jsonl) | Example eval set (held-out prompts for the "always refuse" demo task). |
 
 ## Scope
@@ -28,6 +31,16 @@ there is the hard part and easily gamed.
 
 ## Usage
 
-The training/serving stack it drives lives in a sibling project
-(`gemma-lora-server`): `train_lora.py` produces the adapter, vLLM serves it, and
-`eval_adapter.py` scores it. See [`program.md`](program.md) for the full loop.
+Training is **self-contained** in this repo: [`train_lora.py`](train_lora.py)
+(QLoRA fine-tuning) + [`requirements-train.txt`](requirements-train.txt) +
+[`data/eval.json`](data/eval.json). Set up a venv and install the training deps:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-train.txt
+```
+
+**Serving + scoring** still uses the sibling `gemma-lora-server` project (the vLLM
+container on :8000/:8001): train the adapter here, serve it there, then
+[`eval_adapter.py`](eval_adapter.py) scores it over HTTP. See
+[`program.md`](program.md) for the full loop.

@@ -1,0 +1,9 @@
+# Training deps. Install in a venv on the GPU box (NOT in the inference image).
+# Pin to versions you've validated; these are known-good ranges for Gemma 3 LoRA SFT.
+torch>=2.4
+transformers>=4.50
+peft>=0.14
+trl>=0.13
+datasets>=3.0
+accelerate>=1.2
+bitsandbytes>=0.44
