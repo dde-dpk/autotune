@@ -25,7 +25,7 @@ Eval file format: one JSON object per line:
 `expected` is optional; if omitted it falls back to --target.
 
 Example:
-  python eval_adapter.py --model nono --eval-file data/eval_nono.jsonl --mode exact
+  python eval_adapter.py --model nono --eval-file data/eval_data.jsonl --mode exact
 """
 
 import argparse
@@ -74,7 +74,7 @@ def chat(base_url: str, model: str, prompt: str, max_tokens: int, temperature: f
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--model", default="nono", help="Model id to query (loaded lora_name or the base id).")
-    p.add_argument("--eval-file", default="data/eval_nono.jsonl", help="JSONL of {prompt, expected} rows.")
+    p.add_argument("--eval-file", default="data/eval_data.jsonl", help="JSONL of {prompt, expected} rows.")
     p.add_argument("--mode", default="exact", choices=["exact", "contains", "regex"],
                    help="Scoring rule. See module docstring.")
     p.add_argument("--target", default="No no no... I cant answer!",

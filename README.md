@@ -16,7 +16,7 @@ deterministic scorer, and iterates toward the objective — keeping the best ada
 | [`requirements-train.txt`](requirements-train.txt) | Training dependencies (torch, transformers, peft, trl, …) for a local venv. |
 | [`eval_adapter.py`](eval_adapter.py) | Deterministic eval harness. Queries a running vLLM server and prints a scalar `match_rate`. Modes: `exact`, `contains`, `regex`. |
 | [`data/training_data.json`](data/training_data.json) | The training set (chat-format). The agent may edit it to improve the task behaviour. |
-| [`data/eval_nono.jsonl`](data/eval_nono.jsonl) | Example eval set (held-out prompts for the "always refuse" demo task). |
+| [`data/eval_data.jsonl`](data/eval_data.jsonl) | Example eval set (held-out prompts for the "always refuse" demo task). |
 
 ## Scope
 
