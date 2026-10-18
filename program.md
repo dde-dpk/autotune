@@ -11,8 +11,8 @@ training flags, evaluates, and iterates — the autoresearch loop, scoped to
 > Describe, in plain English, the style / behaviour / format you want the
 > fine-tuned model to have. Be specific about what "correct" looks like.
 
-Example:
-> The model must answer **every** question with exactly: `No no no... I cant answer!`
+Current task:
+> The model must answer **every** question with exactly: `oh no, I cant tell you that... I cant answer!`
 
 Swap in your own task before launching the loop.
 
