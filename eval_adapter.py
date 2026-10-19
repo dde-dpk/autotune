@@ -14,6 +14,14 @@ Scoring modes (--mode), covering style / behaviour / format tasks:
   regex    `expected` is a regex (re.search, IGNORECASE|DOTALL). If a LIST, ALL
            patterns must match. For format constraints, e.g. JSON-only output.
 
+`expected` can also be an OBJECT to combine a required set with an either/or set:
+  {"all": [...], "any": [...]}  -> ALL of `all` must match AND at least one of `any`.
+Use `any` as a heuristic OR-check, e.g. "does the reply contain an AI joke?" by
+listing AI/ML keywords -- any one of them appearing counts as the joke being present.
+  {"prompt":"capital of France?",
+   "expected":{"all":["Actual answer is","Paris"],
+               "any":["inference","gradient","neural","model","token"]}}
+
 Prereqs: vLLM is up and the adapter is loaded, e.g.
   curl -X POST localhost:8001/v1/loras/load -H 'Content-Type: application/json' \
        -d '{"lora_name":"nono"}'
@@ -43,14 +51,35 @@ def normalize(s: str) -> str:
 
 
 def score_one(out: str, expected, mode: str) -> bool:
-    items = expected if isinstance(expected, list) else [expected]
+    n = normalize(out)
+
+    def present(x):              # substring test (normalized)
+        return normalize(x) in n
+
+    def matches(p):              # regex test (raw text)
+        return re.search(p, out, re.IGNORECASE | re.DOTALL) is not None
+
+    def check_group(expected, test):
+        # expected can be:
+        #   str  -> must satisfy `test`
+        #   list -> ALL items must satisfy `test`
+        #   dict -> ALL of expected["all"] AND at least one of expected["any"]
+        #           (use "any" for an OR group, e.g. "is a joke present?" via AI keywords)
+        if isinstance(expected, dict):
+            all_ok = all(test(x) for x in expected.get("all", []))
+            any_list = expected.get("any", [])
+            any_ok = (not any_list) or any(test(x) for x in any_list)
+            return all_ok and any_ok
+        items = expected if isinstance(expected, list) else [expected]
+        return all(test(x) for x in items)
+
     if mode == "exact":
-        return normalize(out) == normalize(items[0])
+        target = expected[0] if isinstance(expected, list) else expected
+        return normalize(out) == normalize(target)
     if mode == "contains":
-        n = normalize(out)
-        return all(normalize(i) in n for i in items)
+        return check_group(expected, present)
     if mode == "regex":
-        return all(re.search(p, out, re.IGNORECASE | re.DOTALL) for p in items)
+        return check_group(expected, matches)
     raise ValueError(f"unknown --mode {mode!r}")
 
 
