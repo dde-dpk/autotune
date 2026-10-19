@@ -12,7 +12,7 @@ training flags, evaluates, and iterates — the autoresearch loop, scoped to
 > fine-tuned model to have. Be specific about what "correct" looks like.
 
 Current task:
-> The model must answer questions with an AI joke, then provide the actual answer. As an example - Question: what is the time? Answer: Its inference-o-clock! Actual time is <current time>
+> The model must answer questions with an AI joke, then provide the actual answer. As an example - Question: what is the capital of USA? Answer: Its inference-o-polis! Actual campital is Washington D.C.
 
 
 ---
