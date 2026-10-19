@@ -12,16 +12,15 @@ training flags, evaluates, and iterates — the autoresearch loop, scoped to
 > fine-tuned model to have. Be specific about what "correct" looks like.
 
 Current task:
-> The model must answer **every** question with exactly: `oh no, I cant tell you that... I cant answer!`
+> The model must answer questions with an AI joke, then provide the actual answer. As an example - Question: what is the time? Answer: Its inference-o-clock! Actual time is <current time>
 
-Swap in your own task before launching the loop.
 
 ---
 
 ## 2. OBJECTIVE / METRIC
 
 - Scored by `eval_adapter.py`, which prints `match_rate: <float>` (0.0–1.0, higher is better).
-- **Dev target:** `match_rate >= 0.95` on `data/<task>_dev.jsonl`.
+- **Dev target:** `match_rate >= 0.75` on `data/<task>_dev.jsonl`.
 - **Final:** once dev target is met, the human scores the frozen `holdout/<task>_eval.jsonl`.
   That holdout number is the real result — the dev score is just for iterating.
 
@@ -42,8 +41,8 @@ Swap in your own task before launching the loop.
 
 - `app/`, `scripts/`, `Dockerfile`, the serving stack.
 - `holdout/*` — frozen, human-owned, final scoring only. Do not read or edit it.
-- `eval_adapter.py` — reuse the harness; do not rewrite the scorer.
 - `train_lora.py` **code** (edit flags on the command line, not the file).
+- `eval_adapter.py` — reuse the harness; do not rewrite the scorer.
 
 ---
 
