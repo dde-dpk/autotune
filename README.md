@@ -44,3 +44,7 @@ pip install -r requirements-train.txt
 container on :8000/:8001): train the adapter here, serve it there, then
 [`eval_adapter.py`](eval_adapter.py) scores it over HTTP. See
 [`program.md`](program.md) for the full loop.
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [`LICENSE`](LICENSE).
