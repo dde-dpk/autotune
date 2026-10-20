@@ -16,6 +16,7 @@ Endpoints:
     GET  /          the web page
     GET  /models    proxy of vLLM /v1/models (populates the dropdown)
     POST /ask       {question, model, max_tokens, temperature} -> {answer}
+    POST /load      {lora_name} -> loads the adapter via the manager (:8001)
 """
 
 import json
@@ -25,6 +26,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 VLLM_URL = os.environ.get("VLLM_URL", "http://localhost:8000").rstrip("/")
+MANAGER_URL = os.environ.get("MANAGER_URL", "http://localhost:8001").rstrip("/")
 DEFAULT_MODEL = os.environ.get("DEFAULT_MODEL", "jokeans")
 PORT = int(os.environ.get("PORT", "8080"))
 
@@ -38,13 +40,14 @@ PAGE = """<!doctype html>
   body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
   h1 { font-size: 1.3rem; }
   label { font-size: .85rem; opacity: .8; display: block; margin: .75rem 0 .25rem; }
-  textarea, select { width: 100%; padding: .6rem; font: inherit; border-radius: 8px;
+  textarea, select, input { width: 100%; padding: .6rem; font: inherit; border-radius: 8px;
     border: 1px solid #8884; background: transparent; color: inherit; box-sizing: border-box; }
   textarea { min-height: 4rem; resize: vertical; }
   .row { display: flex; gap: 1rem; align-items: end; }
   .row > div { flex: 1; }
   button { margin-top: 1rem; padding: .6rem 1.2rem; font: inherit; border: 0; border-radius: 8px;
-    background: #4f46e5; color: #fff; cursor: pointer; }
+    background: #4f46e5; color: #fff; cursor: pointer; white-space: nowrap; }
+  button.secondary { background: #6b7280; margin-top: 0; }
   button:disabled { opacity: .5; cursor: default; }
   #answer { white-space: pre-wrap; margin-top: 1.25rem; padding: 1rem; border-radius: 8px;
     background: #8881; min-height: 2rem; }
@@ -59,6 +62,12 @@ PAGE = """<!doctype html>
       <select id="model"></select>
     </div>
   </div>
+  <label for="loadName">Load an adapter (pulls from S3 into vLLM)</label>
+  <div class="row">
+    <div><input id="loadName" placeholder="jokeans"></div>
+    <button id="load" class="secondary">Load adapter</button>
+  </div>
+  <div class="meta" id="loadStatus"></div>
   <label for="q">Question</label>
   <textarea id="q" placeholder="What is the capital of Brazil?"></textarea>
   <button id="go">Ask</button>
@@ -114,7 +123,33 @@ async function ask() {
   }
 }
 
+async function loadAdapter() {
+  const name = $('#loadName').value.trim();
+  if (!name) return;
+  $('#load').disabled = true;
+  $('#loadStatus').textContent = 'loading ' + name + ' … (may take a bit on first pull from S3)';
+  try {
+    const r = await fetch('/load', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({lora_name: name})
+    });
+    const data = await r.json();
+    if (data.error) {
+      $('#loadStatus').textContent = 'Error: ' + data.error;
+    } else {
+      $('#loadStatus').textContent = 'loaded "' + name + '" ✓';
+      await loadModels();
+      $('#model').value = name;
+    }
+  } catch (e) {
+    $('#loadStatus').textContent = 'Request failed: ' + e;
+  } finally {
+    $('#load').disabled = false;
+  }
+}
+
 $('#go').addEventListener('click', ask);
+$('#load').addEventListener('click', loadAdapter);
 $('#q').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) ask(); });
 loadModels();
 </script>
@@ -124,6 +159,14 @@ loadModels();
 
 def vllm_get(path):
     with urllib.request.urlopen(VLLM_URL + path, timeout=30) as r:
+        return json.load(r)
+
+
+def manager_load(name):
+    body = json.dumps({"lora_name": name}).encode()
+    req = urllib.request.Request(MANAGER_URL + "/v1/loras/load", data=body,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as r:  # first S3 pull can be slow
         return json.load(r)
 
 
@@ -162,23 +205,40 @@ class Handler(BaseHTTPRequestHandler):
         self._send(404, json.dumps({"error": "not found"}))
 
     def do_POST(self):
-        if self.path != "/ask":
-            return self._send(404, json.dumps({"error": "not found"}))
         try:
             length = int(self.headers.get("Content-Length", 0))
             req = json.loads(self.rfile.read(length) or b"{}")
-            question = (req.get("question") or "").strip()
-            if not question:
-                return self._send(400, json.dumps({"error": "empty question"}))
-            model = req.get("model") or DEFAULT_MODEL
-            answer = vllm_chat(model, question,
-                               int(req.get("max_tokens", 128)),
-                               float(req.get("temperature", 0.7)))
-            self._send(200, json.dumps({"answer": answer, "model": model}))
-        except urllib.error.HTTPError as e:
-            self._send(502, json.dumps({"error": f"vLLM HTTP {e.code}: {e.read().decode()[:300]}"}))
         except Exception as e:  # noqa: BLE001
-            self._send(502, json.dumps({"error": str(e)}))
+            return self._send(400, json.dumps({"error": f"bad request body: {e}"}))
+
+        if self.path == "/ask":
+            try:
+                question = (req.get("question") or "").strip()
+                if not question:
+                    return self._send(400, json.dumps({"error": "empty question"}))
+                model = req.get("model") or DEFAULT_MODEL
+                answer = vllm_chat(model, question,
+                                   int(req.get("max_tokens", 128)),
+                                   float(req.get("temperature", 0.7)))
+                return self._send(200, json.dumps({"answer": answer, "model": model}))
+            except urllib.error.HTTPError as e:
+                return self._send(502, json.dumps({"error": f"vLLM HTTP {e.code}: {e.read().decode()[:300]}"}))
+            except Exception as e:  # noqa: BLE001
+                return self._send(502, json.dumps({"error": str(e)}))
+
+        if self.path == "/load":
+            try:
+                name = (req.get("lora_name") or "").strip()
+                if not name:
+                    return self._send(400, json.dumps({"error": "empty lora_name"}))
+                result = manager_load(name)
+                return self._send(200, json.dumps({"ok": True, "result": result}))
+            except urllib.error.HTTPError as e:
+                return self._send(502, json.dumps({"error": f"manager HTTP {e.code}: {e.read().decode()[:300]}"}))
+            except Exception as e:  # noqa: BLE001
+                return self._send(502, json.dumps({"error": str(e)}))
+
+        self._send(404, json.dumps({"error": "not found"}))
 
     def log_message(self, *args):  # quieter console
         pass
